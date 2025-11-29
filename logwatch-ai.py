@@ -11,6 +11,7 @@ import logging
 import smtplib
 import time
 import fcntl
+import socket
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -209,26 +210,36 @@ class LogwatchAIAnalyzer:
 
         prompt = f"""あなたはLinuxシステムセキュリティの専門家です。以下のlogwatch出力を分析し、構造化された評価を日本語で提供してください。
 
-重要: 実際のセキュリティ問題と、即座に対応が必要な重大なシステム問題のみに焦点を当ててください。
+【最重要】本当に対応が必要な問題だけを報告してください。インターネット公開サーバーで日常的に発生する事象は全て無視してください。
 
-以下の通常運用は無視してください：
-- 定期的なfail2banブロック（1000回/日未満）
-- ブロックされた通常のSSHログイン試行
-- 定期的なmod_proxy接続試行（50回/日未満）
-- ディスク使用率80%未満
+以下は【完全に無視】してください（critical_issuesやwarningsに含めない）：
+- 失敗したSSHログイン試行（ブロック済みの攻撃）
+- 404/400/401エラーを返したHTTPリクエスト（スキャンボットは日常的）
+- /.env、/.git/config、/phpMyAdmin等への脆弱性スキャン（全て失敗している）
+- "Attempts to use known hacks"の報告（攻撃試行は失敗している）
+- mod_proxyへの接続試行
+- fail2banによるブロック
+- ディスク使用率85%未満
 - 通常のサービス再起動
 - 定期的なcronジョブ実行
+- パッケージの更新・インストール
+- 通常のメール送受信
 
-以下の重大な問題についてアラートしてください：
-- 不正アクセスの成功試行
-- ディスク使用率80%超過
-- サービス障害やクラッシュ
-- 異常なネットワークトラフィックパターン
-- セキュリティ侵害の可能性
-- 大量SSHブルートフォース攻撃（1000回以上）
-- 重大なシステムエラー
-- データベースエラーや破損
-- メモリ関連の問題
+以下の【本当に重大な問題のみ】をcritical_issuesに含めてください：
+- 認証成功後の不審なアクティビティ（ログイン成功+異常操作）
+- rootや管理者での予期しないログイン成功
+- ディスク使用率85%超過
+- サービスの異常停止・クラッシュ（再起動ではなく停止）
+- カーネルパニックやOOMキラー発動
+- データベースの破損やクラッシュ
+- ファイルシステムエラー
+
+severity判定基準：
+- "none": 問題なし（日常的なスキャンのみ）
+- "low": 軽微な注意事項のみ
+- "medium": 確認が必要だが緊急ではない
+- "high": 24時間以内の対応が必要
+- "critical": 即時対応が必要
 
 JSON形式で日本語で回答してください：
 {{
@@ -330,6 +341,7 @@ Logwatch出力:
         }
         emoji = emoji_map.get(severity, '❓')
         severity_text = severity_ja.get(severity, severity)
+        hostname = socket.gethostname()
 
         if html:
             body = f"""<!DOCTYPE html>
@@ -351,6 +363,7 @@ Logwatch出力:
 <body>
     <div class="header">
         <div class="severity">{emoji} 重要度: {severity_text}</div>
+        <div>ホスト: {hostname}</div>
         <div>日時: {datetime.now().strftime('%Y年%m月%d日 %H:%M:%S')}</div>
     </div>
 
@@ -418,6 +431,7 @@ Logwatch出力:
             # Plain text version
             body = f"""{emoji} LOGWATCH AI 分析結果 - {datetime.now().strftime('%Y年%m月%d日 %H:%M:%S')}
 {'=' * 60}
+ホスト: {hostname}
 重要度: {severity_text}
 概要: {analysis.get('summary', '概要情報がありません')}
 
@@ -478,7 +492,8 @@ Logwatch出力:
             severity_text = severity_ja.get(severity, severity)
 
             msg = MIMEMultipart('alternative')
-            msg['Subject'] = f"{emoji} Logwatch AI レポート - 重要度: {severity_text} - {datetime.now().strftime('%Y年%m月%d日')}"
+            hostname = socket.gethostname()
+            msg['Subject'] = f"{emoji} [{hostname}] Logwatch AI レポート - 重要度: {severity_text} - {datetime.now().strftime('%Y年%m月%d日')}"
             msg['From'] = self.config['from_email']
             msg['To'] = ', '.join(self.config['to_emails'])
 
