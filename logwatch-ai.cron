@@ -1,0 +1,13 @@
+# Logwatch AI Analyzer Cron Configuration
+# Place this file in /etc/cron.d/logwatch-ai
+
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+# Run Logwatch AI analyzer daily at 7:00 AM
+# Analyzes yesterday's logs and sends AI-filtered alerts
+0 7 * * * root /opt/logwatch-ai/logwatch-ai.py >> /var/log/logwatch-ai.log 2>&1
+
+# Optional: Run a quick check every 6 hours for critical issues only
+# Uncomment to enable (requires editing config to set a different time range)
+# 0 */6 * * * root /opt/logwatch-ai/logwatch-ai.py --quick-check >> /var/log/logwatch-ai.log 2>&1

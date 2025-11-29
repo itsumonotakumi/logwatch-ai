@@ -1,0 +1,28 @@
+{
+    "openai_api_key": "sk-proj-YOUR_API_KEY_HERE",
+    "openai_model": "gpt-4o-mini",
+    "smtp_host": "localhost",
+    "smtp_port": 25,
+    "smtp_user": "",
+    "smtp_password": "",
+    "smtp_use_tls": false,
+    "from_email": "logwatch-ai@yourdomain.com",
+    "to_emails": [
+        "admin@yourdomain.com",
+        "security@yourdomain.com"
+    ],
+    "alert_threshold": "medium",
+    "logwatch_output_file": "/var/log/logwatch_output.txt",
+    "always_send_summary": false,
+
+    "_comment_rate_limits": "Safety features to prevent API abuse",
+    "max_requests_per_hour": 10,
+    "max_requests_per_day": 50,
+    "min_interval_minutes": 5,
+    "max_retries": 3,
+    "retry_delay_seconds": 30,
+
+    "_comment_threshold": "Threshold levels: none, low, medium, high, critical",
+    "_comment_model": "Available models: gpt-4o-mini (cheapest), gpt-4o, gpt-4-turbo",
+    "_comment_summary": "Set always_send_summary to true to receive daily reports regardless of issues"
+}
