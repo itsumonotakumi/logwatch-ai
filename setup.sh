@@ -16,6 +16,7 @@ NC='\033[0m' # No Color
 INSTALL_DIR="/opt/logwatch-ai"
 CONFIG_DIR="/etc/logwatch-ai"
 LOG_DIR="/var/log"
+VENV_DIR="$INSTALL_DIR/venv"
 
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}     Logwatch AI Setup Script          ${NC}"
@@ -47,9 +48,15 @@ if ! command -v logwatch &> /dev/null; then
 fi
 echo "logwatch is installed"
 
-# Install Python dependencies
+# Create virtual environment and install Python dependencies
+echo -e "${YELLOW}Creating virtual environment...${NC}"
+mkdir -p "$INSTALL_DIR"
+python3 -m venv "$VENV_DIR"
+echo "Virtual environment created at $VENV_DIR"
+
 echo -e "${YELLOW}Installing Python dependencies...${NC}"
-pip3 install openai requests --quiet
+"$VENV_DIR/bin/pip" install --upgrade pip --quiet
+"$VENV_DIR/bin/pip" install openai requests --quiet
 echo "Dependencies installed"
 
 # Create configuration directory
@@ -134,10 +141,14 @@ mkdir -p "$INSTALL_DIR"
 cp logwatch_ai.py "$INSTALL_DIR/logwatch-ai.py"
 chmod +x "$INSTALL_DIR/logwatch-ai.py"
 
-# Create symlink in /usr/local/bin for convenience
-ln -sf "$INSTALL_DIR/logwatch-ai.py" /usr/local/bin/logwatch-ai
+# Create wrapper script in /usr/local/bin for convenience
+cat > /usr/local/bin/logwatch-ai << 'WRAPPER'
+#!/bin/bash
+exec /opt/logwatch-ai/venv/bin/python /opt/logwatch-ai/logwatch-ai.py "$@"
+WRAPPER
+chmod +x /usr/local/bin/logwatch-ai
 echo "Script installed to $INSTALL_DIR/logwatch-ai.py"
-echo "Symlink created at /usr/local/bin/logwatch-ai"
+echo "Wrapper script created at /usr/local/bin/logwatch-ai"
 
 # Create cron job
 echo -e "${YELLOW}Setting up cron job...${NC}"
@@ -148,7 +159,7 @@ cat > "$CRON_FILE" << EOF
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 
-0 7 * * * root /opt/logwatch-ai/logwatch-ai.py >> /var/log/logwatch-ai.log 2>&1
+0 7 * * * root /opt/logwatch-ai/venv/bin/python /opt/logwatch-ai/logwatch-ai.py >> /var/log/logwatch-ai.log 2>&1
 EOF
 
 chmod 644 "$CRON_FILE"
@@ -200,7 +211,7 @@ echo
 echo -e "${YELLOW}Testing installation...${NC}"
 echo "Running a test analysis (this may take a moment)..."
 
-if /opt/logwatch-ai/logwatch-ai.py; then
+if /opt/logwatch-ai/venv/bin/python /opt/logwatch-ai/logwatch-ai.py; then
     echo -e "${GREEN}✓ Test successful!${NC}"
 else
     echo -e "${RED}✗ Test failed. Please check the logs at /var/log/logwatch-ai.log${NC}"
@@ -215,9 +226,10 @@ echo
 echo "Logwatch AI has been successfully installed!"
 echo
 echo "Installation directory: $INSTALL_DIR"
+echo "Virtual environment: $VENV_DIR"
 echo "Configuration file: $CONFIG_DIR/config.json"
 echo "Main script: $INSTALL_DIR/logwatch-ai.py"
-echo "Symlink: /usr/local/bin/logwatch-ai"
+echo "Wrapper script: /usr/local/bin/logwatch-ai"
 echo "Cron job: $CRON_FILE"
 echo "Log file: /var/log/logwatch-ai.log"
 echo
