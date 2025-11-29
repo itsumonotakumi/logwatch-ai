@@ -52,7 +52,7 @@ OpenAI GPT-4o-mini使用時の概算：
 
 ```bash
 # リポジトリをクローン
-git clone https://github.com/yourusername/logwatch-ai.git
+git clone https://github.com/itsumonotakumi/logwatch-ai.git
 cd logwatch-ai
 
 # セットアップスクリプトを実行
