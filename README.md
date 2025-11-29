@@ -277,7 +277,7 @@ Alert on these critical issues:
 
 **Logwatch AI License** - カスタムライセンス
 
-著作権 (c) 2025 いつもの匠（ヤマネックス株式会社） / itumonotakumi (Yamanex Co., Ltd.)
+著作権 (c) 2025 いつもの匠（ヤマネックス非公開株式会社） / itumonotakumi (Yamanex Private Co., Ltd.)
 
 ### 許可される行為
 - ✅ 個人利用・商用利用（社内業務での使用）
