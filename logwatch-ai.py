@@ -80,6 +80,22 @@ class LogwatchAIAnalyzer:
 
         return default_config
 
+    def get_disk_usage(self) -> str:
+        """Get actual disk usage information using df command"""
+        try:
+            result = subprocess.run(
+                ['df', '-h'],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            if result.returncode == 0:
+                return result.stdout
+            return ""
+        except Exception as e:
+            logger.warning(f"Failed to get disk usage: {e}")
+            return ""
+
     def run_logwatch(self) -> str:
         """Execute logwatch and capture output"""
         try:
@@ -254,7 +270,8 @@ JSON形式で日本語で回答してください：
         "disk_usage_percent": 数値,
         "errors_count": 数値
     }},
-    "recommendations": ["推奨アクション1", "推奨アクション2"]
+    "recommendations": ["推奨アクション1", "推奨アクション2"],
+    "log_excerpts": ["重要な問題がある場合のみ、関連するログの抜粋を含める（severity が medium 以上の場合）"]
 }}
 
 Logwatch出力:
@@ -320,7 +337,7 @@ Logwatch出力:
 
         return severity_levels.get(severity, 0) >= severity_levels.get(threshold, 2)
 
-    def format_email_body(self, analysis: Dict[str, Any], html: bool = True) -> str:
+    def format_email_body(self, analysis: Dict[str, Any], disk_info: str = "", html: bool = True) -> str:
         """Format analysis results for email"""
         severity = analysis.get('severity', 'unknown').upper()
         severity_ja = {
@@ -424,6 +441,29 @@ Logwatch出力:
         </ul>
     </div>"""
 
+            # ログ詳細（重要な問題がある場合のみ）
+            if analysis.get('log_excerpts') and severity in ['MEDIUM', 'HIGH', 'CRITICAL', 'ERROR']:
+                body += """
+    <div class="section">
+        <h3>📄 関連ログ詳細</h3>
+        <pre style="background: #f4f4f4; padding: 10px; border-radius: 5px; overflow-x: auto; font-size: 12px;">"""
+                for excerpt in analysis['log_excerpts']:
+                    import html as html_module
+                    body += html_module.escape(str(excerpt)) + "\n"
+                body += """</pre>
+    </div>"""
+
+            # ディスク容量情報（毎回表示）
+            if disk_info:
+                body += """
+    <div class="section stats">
+        <h3>💾 ディスク容量</h3>
+        <pre style="background: #e9ecef; padding: 10px; border-radius: 5px; overflow-x: auto; font-size: 12px;">"""
+                import html as html_module
+                body += html_module.escape(disk_info)
+                body += """</pre>
+    </div>"""
+
             body += """
 </body>
 </html>"""
@@ -465,10 +505,24 @@ Logwatch出力:
                 body += "💡 推奨対応:\n"
                 for rec in analysis['recommendations']:
                     body += f"  • {rec}\n"
+                body += "\n"
+
+            # ログ詳細（重要な問題がある場合のみ）
+            if analysis.get('log_excerpts') and severity in ['MEDIUM', 'HIGH', 'CRITICAL', 'ERROR']:
+                body += "📄 関連ログ詳細:\n"
+                body += "-" * 40 + "\n"
+                for excerpt in analysis['log_excerpts']:
+                    body += f"{excerpt}\n"
+                body += "-" * 40 + "\n\n"
+
+            # ディスク容量情報（毎回表示）
+            if disk_info:
+                body += "💾 ディスク容量:\n"
+                body += disk_info + "\n"
 
         return body
 
-    def send_email(self, analysis: Dict[str, Any]) -> bool:
+    def send_email(self, analysis: Dict[str, Any], disk_info: str = "") -> bool:
         """Send email notification"""
         try:
             severity = analysis.get('severity', 'unknown').upper()
@@ -498,8 +552,8 @@ Logwatch出力:
             msg['To'] = ', '.join(self.config['to_emails'])
 
             # Add both plain text and HTML versions
-            text_part = MIMEText(self.format_email_body(analysis, html=False), 'plain')
-            html_part = MIMEText(self.format_email_body(analysis, html=True), 'html')
+            text_part = MIMEText(self.format_email_body(analysis, disk_info, html=False), 'plain')
+            html_part = MIMEText(self.format_email_body(analysis, disk_info, html=True), 'html')
 
             msg.attach(text_part)
             msg.attach(html_part)
@@ -545,6 +599,10 @@ Logwatch出力:
                 logger.error("No logwatch output to analyze")
                 return
 
+            # Get disk usage information
+            logger.info("Getting disk usage information...")
+            disk_info = self.get_disk_usage()
+
             # Analyze with AI
             logger.info("Analyzing logs with AI...")
             analysis = self.analyze_with_ai(log_content)
@@ -556,7 +614,7 @@ Logwatch出力:
             # Send alert if needed
             if self.should_send_alert(analysis):
                 logger.info(f"Sending alert email (severity: {analysis.get('severity', 'unknown')})")
-                self.send_email(analysis)
+                self.send_email(analysis, disk_info)
             else:
                 logger.info(f"No alert needed (severity: {analysis.get('severity', 'unknown')})")
 
