@@ -267,7 +267,7 @@ Logwatch出力:
                 response = self.client.chat.completions.create(
                     model=self.config['openai_model'],
                     messages=[
-                        {"role": "system", "content": "あなたはLinuxセキュリティの専門家です。簡潔で実用的な分析を日本語で提供してください。"},
+                        {"role": "system", "content": "あなたはLinuxセキュリティの専門家です。全ての回答を必ず日本語で出力してください。英語は絶対に使用しないでください。summary、critical_issues、warnings、recommendationsの全てを日本語で記述してください。"},
                         {"role": "user", "content": prompt}
                     ],
                     # temperature=0,  # Removed - not supported by gpt-4o-mini
